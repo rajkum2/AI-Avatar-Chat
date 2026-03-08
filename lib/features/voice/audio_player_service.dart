@@ -10,11 +10,12 @@ final audioPlayerServiceProvider = Provider<AudioPlayerService>((ref) {
 class AudioPlayerService {
   final AudioPlayer _player = AudioPlayer();
   final _completionController = StreamController<void>.broadcast();
+  late final StreamSubscription<void> _playerSub;
 
   Stream<void> get onComplete => _completionController.stream;
 
   AudioPlayerService() {
-    _player.onPlayerComplete.listen((_) {
+    _playerSub = _player.onPlayerComplete.listen((_) {
       _completionController.add(null);
     });
   }
@@ -32,6 +33,7 @@ class AudioPlayerService {
   }
 
   void dispose() {
+    _playerSub.cancel();
     _player.dispose();
     _completionController.close();
   }

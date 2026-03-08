@@ -15,6 +15,7 @@ class _MicButtonState extends ConsumerState<MicButton>
     with SingleTickerProviderStateMixin {
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+  bool _tapping = false;
 
   @override
   void initState() {
@@ -50,7 +51,7 @@ class _MicButtonState extends ConsumerState<MicButton>
       }
     }
 
-    final isDisabled = state == ConversationState.thinking;
+    const isDisabled = false;
 
     return Semantics(
       button: true,
@@ -104,19 +105,26 @@ class _MicButtonState extends ConsumerState<MicButton>
     );
   }
 
-  void _onTap() {
-    final state = ref.read(conversationStateProvider);
-    final notifier = ref.read(conversationStateProvider.notifier);
+  Future<void> _onTap() async {
+    if (_tapping) return;
+    _tapping = true;
 
-    switch (state) {
-      case ConversationState.idle:
-        notifier.startListening();
-      case ConversationState.listening:
-        notifier.stopListening();
-      case ConversationState.speaking:
-        notifier.interrupt();
-      case ConversationState.thinking:
-        break;
+    try {
+      final state = ref.read(conversationStateProvider);
+      final notifier = ref.read(conversationStateProvider.notifier);
+
+      switch (state) {
+        case ConversationState.idle:
+          await notifier.startListening();
+        case ConversationState.listening:
+          await notifier.stopListening();
+        case ConversationState.speaking:
+          await notifier.interrupt();
+        case ConversationState.thinking:
+          break;
+      }
+    } finally {
+      _tapping = false;
     }
   }
 

@@ -31,6 +31,7 @@ class ConversationNotifier extends StateNotifier<ConversationState> {
   StreamSubscription<String>? _errorSub;
   StreamSubscription<void>? _ttsCompletionSub;
   bool _processingResult = false;
+  bool _cancelled = false;
 
   ConversationNotifier(this._ref) : super(ConversationState.idle);
 
@@ -153,6 +154,7 @@ class ConversationNotifier extends StateNotifier<ConversationState> {
     }
 
     // Transition to THINKING
+    _cancelled = false;
     state = ConversationState.thinking;
     _updateAvatarState();
 
@@ -171,6 +173,12 @@ class ConversationNotifier extends StateNotifier<ConversationState> {
             'Give me a moment...';
         await Future.delayed(const Duration(seconds: 2));
         reply = await chatService.sendMessage(transcript, history);
+      }
+
+      // If user cancelled while we were waiting for the API, discard result
+      if (_cancelled) {
+        debugPrint('Pipeline: API response discarded (cancelled)');
+        return;
       }
 
       // Store AI response
@@ -216,6 +224,11 @@ class ConversationNotifier extends StateNotifier<ConversationState> {
   }
 
   Future<void> interrupt() async {
+    if (state == ConversationState.thinking) {
+      await cancelThinking();
+      return;
+    }
+
     if (state != ConversationState.speaking) return;
 
     final ttsService = _ref.read(ttsServiceProvider);
@@ -229,14 +242,24 @@ class ConversationNotifier extends StateNotifier<ConversationState> {
     await startListening();
   }
 
-  void resetToIdle() {
+  Future<void> cancelThinking() async {
+    if (state != ConversationState.thinking) return;
+
+    _cancelled = true;
+    _ref.read(transcriptProvider.notifier).state = '';
+    state = ConversationState.idle;
+    _updateAvatarState();
+    debugPrint('Pipeline: Cancelled by user during thinking');
+  }
+
+  Future<void> resetToIdle() async {
     _cancelListenSubscriptions();
     _ttsCompletionSub?.cancel();
     _processingResult = false;
 
     // Stop any active STT or TTS
-    _ref.read(sttServiceProvider).stop();
-    _ref.read(ttsServiceProvider).stop();
+    await _ref.read(sttServiceProvider).stop();
+    await _ref.read(ttsServiceProvider).stop();
 
     _ref.read(transcriptProvider.notifier).state = '';
     state = ConversationState.idle;

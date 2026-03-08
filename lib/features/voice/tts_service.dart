@@ -55,15 +55,21 @@ class TTSService {
 
       // Log available voices for debugging
       if (kDebugMode) {
-        final voices = await _tts.getVoices;
-        final enVoices = (voices as List)
-            .where((v) =>
-                v['locale']?.toString().startsWith('en') == true)
-            .take(5)
-            .toList();
-        debugPrint('TTS: ${enVoices.length} English voices available');
-        for (final v in enVoices) {
-          debugPrint('  - ${v['name']} (${v['locale']})');
+        try {
+          final voices = await _tts.getVoices;
+          if (voices is List) {
+            final enVoices = voices
+                .where((v) =>
+                    v['locale']?.toString().startsWith('en') == true)
+                .take(5)
+                .toList();
+            debugPrint('TTS: ${enVoices.length} English voices available');
+            for (final v in enVoices) {
+              debugPrint('  - ${v['name']} (${v['locale']})');
+            }
+          }
+        } catch (e) {
+          debugPrint('TTS: Could not enumerate voices: $e');
         }
       }
 

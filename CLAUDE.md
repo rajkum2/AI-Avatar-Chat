@@ -219,8 +219,29 @@ Anthropic API supports direct browser access with the `anthropic-dangerous-direc
 | 5 | Something went wrong — please try again | HTTP 500+ | SnackBar (3s) | ✅ |
 | 6 | Your session expired — starting fresh | JWT expired | Phase 2 (skipped) | ⬜ |
 | 7 | Browser not supported — please use Chrome | Web Speech API missing | Persistent banner | ✅ |
-- [ ] **Step 10 (NEXT):** End-to-end testing in Chrome
-- [ ] **Step 11:** Interrupt handling — tap mic during speaking
+- [x] **Step 10:** End-to-end testing — code audit + bug fixes. Fixed: (1) AudioPlayerService stream subscription leak — now stored and cancelled in dispose(), (2) resetToIdle() missing awaits on stop() — now async with proper awaits, (3) TTS voice list unsafe cast — added null/type check + try/catch, (4) Mic button rapid-tap race condition — added `_tapping` guard to debounce and await async operations. All tests pass, 0 analyzer issues, web build succeeds.
+
+### What was changed in Step 10
+- `lib/features/voice/audio_player_service.dart` — Store `_playerSub` subscription, cancel in dispose()
+- `lib/features/conversation/conversation_flow.dart` — `resetToIdle()` → async, await both stop() calls
+- `lib/features/voice/tts_service.dart` — Safe voice enumeration: `is List` check + try/catch
+- `lib/widgets/mic_button.dart` — `_tapping` bool guard + await on all notifier calls, prevents double-tap race condition
+
+### Manual Test Checklist (for Chrome)
+Run with `flutter run -d chrome --web-port 8080` and verify:
+- [ ] App loads with dark gradient background, avatar placeholder visible
+- [ ] "Tap mic to start" status text shown
+- [ ] Tap mic → browser requests mic permission → status changes to "Listening..." (red mic icon)
+- [ ] Speak a phrase → live transcript appears in white
+- [ ] After silence → status changes to "Thinking..." (spinner)
+- [ ] Claude API responds → status changes to "Speaking..." → TTS plays reply → transcript shows AI text in blue
+- [ ] After TTS completes → returns to "Tap mic to start" (idle)
+- [ ] Tap mic during speaking → TTS stops, immediately starts listening again (interrupt)
+- [ ] Speak nothing → "Couldn't hear you" SnackBar appears
+- [ ] Without API key → "API key not set" SnackBar on startup
+- [ ] Clear conversation button → "Conversation cleared" SnackBar, state resets
+- [ ] Rapid double-tap mic → only one action fires (no crash)
+- [ ] **Step 11 (NEXT):** Interrupt handling — tap mic during speaking
 - [ ] **Step 12:** Performance optimization — measure latency, streaming
 - [ ] **Step 13:** Firebase Hosting deploy
 - [ ] **Step 14:** ElevenLabs TTS upgrade
