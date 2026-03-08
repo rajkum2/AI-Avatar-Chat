@@ -4,6 +4,7 @@ import '../core/theme.dart';
 import '../features/avatar/avatar_widget.dart';
 import '../features/chat/chat_provider.dart';
 import '../features/conversation/conversation_flow.dart';
+import '../features/conversation/conversation_state.dart';
 import '../widgets/mic_button.dart';
 import '../widgets/transcript_overlay.dart';
 import '../widgets/status_indicator.dart';
@@ -13,6 +14,8 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final conversationState = ref.watch(conversationStateProvider);
+
     // Listen for error messages and show SnackBar
     ref.listen<String>(errorMessageProvider, (previous, next) {
       if (next.isNotEmpty) {
@@ -25,7 +28,6 @@ class HomeScreen extends ConsumerWidget {
             margin: const EdgeInsets.fromLTRB(16, 0, 16, 100),
           ),
         );
-        // Clear the error after showing
         Future.microtask(() {
           ref.read(errorMessageProvider.notifier).state = '';
         });
@@ -33,88 +35,123 @@ class HomeScreen extends ConsumerWidget {
     });
 
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            // App title bar — 60px
-            SizedBox(
-              height: 60,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'AI Avatar Chat',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(
-                            Icons.delete_outline,
-                            color: AppColors.textSecondary,
-                          ),
-                          tooltip: 'Clear conversation',
-                          onPressed: () {
-                            ref
-                                .read(chatHistoryProvider.notifier)
-                                .clearHistory();
-                            ref
-                                .read(conversationStateProvider.notifier)
-                                .resetToIdle();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Conversation cleared'),
-                                duration: Duration(seconds: 1),
-                              ),
-                            );
-                          },
-                        ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.settings_outlined,
-                            color: AppColors.textSecondary,
-                          ),
-                          onPressed: () {},
-                        ),
-                      ],
-                    ),
-                  ],
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              AppColors.background,
+              Color(0xFF0B1120),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // ── Title bar ──
+              _buildTitleBar(context, ref),
+
+              // ── Divider ──
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Divider(
+                  height: 1,
+                  color: AppColors.surfaceLight.withValues(alpha: 0.2),
                 ),
               ),
-            ),
 
-            // Avatar area — 55% of remaining height
-            const Expanded(
-              flex: 55,
-              child: Center(
-                child: AvatarWidget(),
+              // ── Avatar area — 55% ──
+              const Expanded(
+                flex: 55,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24),
+                  child: AvatarWidget(),
+                ),
+              ),
+
+              // ── Status + Transcript + Mic ──
+              _buildBottomSection(conversationState),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTitleBar(BuildContext context, WidgetRef ref) {
+    return SizedBox(
+      height: 56,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          children: [
+            const SizedBox(width: 8),
+            const Text(
+              'AI Avatar Chat',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+                letterSpacing: 0.3,
               ),
             ),
-
-            // Status indicator — 40px
-            const StatusIndicator(),
-
-            // Transcript area — 80px
-            const SizedBox(
-              height: 80,
-              child: TranscriptOverlay(),
+            const Spacer(),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, size: 20),
+              tooltip: 'Clear conversation',
+              onPressed: () {
+                ref.read(chatHistoryProvider.notifier).clearHistory();
+                ref.read(conversationStateProvider.notifier).resetToIdle();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Conversation cleared'),
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+              },
             ),
-
-            // Mic button — centered, 40px from bottom
-            const Padding(
-              padding: EdgeInsets.only(bottom: 40),
-              child: Center(
-                child: MicButton(),
-              ),
+            IconButton(
+              icon: const Icon(Icons.settings_outlined, size: 20),
+              tooltip: 'Settings',
+              onPressed: () {},
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildBottomSection(ConversationState conversationState) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.transparent,
+            AppColors.surface.withValues(alpha: 0.3),
+          ],
+        ),
+      ),
+      child: const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Status indicator
+          StatusIndicator(),
+
+          // Transcript area — constrained height, scrollable
+          SizedBox(
+            height: 80,
+            child: TranscriptOverlay(),
+          ),
+
+          // Mic button with bottom padding
+          Padding(
+            padding: EdgeInsets.only(bottom: 32, top: 8),
+            child: MicButton(),
+          ),
+        ],
       ),
     );
   }

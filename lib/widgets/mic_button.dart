@@ -23,7 +23,7 @@ class _MicButtonState extends ConsumerState<MicButton>
       vsync: this,
       duration: const Duration(milliseconds: 1000),
     );
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.12).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
   }
@@ -36,10 +36,10 @@ class _MicButtonState extends ConsumerState<MicButton>
 
   @override
   Widget build(BuildContext context) {
-    final conversationState = ref.watch(conversationStateProvider);
+    final state = ref.watch(conversationStateProvider);
 
-    // Control pulse animation based on state
-    if (conversationState == ConversationState.listening) {
+    // Start/stop pulse for listening state
+    if (state == ConversationState.listening) {
       if (!_pulseController.isAnimating) {
         _pulseController.repeat(reverse: true);
       }
@@ -50,58 +50,65 @@ class _MicButtonState extends ConsumerState<MicButton>
       }
     }
 
-    final bool isDisabled = conversationState == ConversationState.thinking;
+    final isDisabled = state == ConversationState.thinking;
 
-    return AnimatedBuilder(
-      animation: _pulseAnimation,
-      builder: (context, child) {
-        final scale = conversationState == ConversationState.listening
-            ? _pulseAnimation.value
-            : 1.0;
+    return Semantics(
+      button: true,
+      label: _getAccessibilityLabel(state),
+      child: AnimatedBuilder(
+        animation: _pulseAnimation,
+        builder: (context, child) {
+          final scale = state == ConversationState.listening
+              ? _pulseAnimation.value
+              : 1.0;
 
-        return Transform.scale(
-          scale: scale,
-          child: GestureDetector(
-            onTap: isDisabled ? null : _onTap,
-            child: Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _getBackgroundColor(conversationState),
-                border: Border.all(
-                  color: _getBorderColor(conversationState),
-                  width: 2,
-                ),
-                boxShadow: conversationState == ConversationState.listening
-                    ? [
-                        BoxShadow(
-                          color: AppColors.active.withValues(alpha: 0.4),
-                          blurRadius: 20,
-                          spreadRadius: 4,
-                        ),
-                      ]
-                    : [
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.2),
-                          blurRadius: 10,
-                          spreadRadius: 2,
-                        ),
-                      ],
-              ),
-              child: _buildIcon(conversationState),
+          return Transform.scale(
+            scale: scale,
+            child: _buildButton(state, isDisabled),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildButton(ConversationState state, bool isDisabled) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: isDisabled ? null : _onTap,
+        customBorder: const CircleBorder(),
+        splashColor: _getSplashColor(state),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+          width: 76,
+          height: 76,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: _getBackgroundColor(state),
+            border: Border.all(
+              color: _getBorderColor(state),
+              width: 2.5,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: _getShadowColor(state),
+                blurRadius: state == ConversationState.listening ? 24 : 12,
+                spreadRadius: state == ConversationState.listening ? 4 : 1,
+              ),
+            ],
           ),
-        );
-      },
+          child: Center(child: _buildIcon(state)),
+        ),
+      ),
     );
   }
 
   void _onTap() {
-    final conversationState = ref.read(conversationStateProvider);
+    final state = ref.read(conversationStateProvider);
     final notifier = ref.read(conversationStateProvider.notifier);
 
-    switch (conversationState) {
+    switch (state) {
       case ConversationState.idle:
         notifier.startListening();
       case ConversationState.listening:
@@ -116,10 +123,11 @@ class _MicButtonState extends ConsumerState<MicButton>
   Color _getBackgroundColor(ConversationState state) {
     switch (state) {
       case ConversationState.idle:
-        return Colors.transparent;
+        return AppColors.surface;
       case ConversationState.listening:
         return AppColors.active;
       case ConversationState.thinking:
+        return AppColors.surface;
       case ConversationState.speaking:
         return AppColors.surface;
     }
@@ -128,44 +136,72 @@ class _MicButtonState extends ConsumerState<MicButton>
   Color _getBorderColor(ConversationState state) {
     switch (state) {
       case ConversationState.idle:
-        return AppColors.textPrimary;
+        return AppColors.primary.withValues(alpha: 0.6);
       case ConversationState.listening:
         return AppColors.active;
       case ConversationState.thinking:
+        return AppColors.surfaceLight;
       case ConversationState.speaking:
-        return AppColors.textSecondary;
+        return AppColors.primary.withValues(alpha: 0.4);
+    }
+  }
+
+  Color _getShadowColor(ConversationState state) {
+    switch (state) {
+      case ConversationState.idle:
+        return AppColors.primary.withValues(alpha: 0.15);
+      case ConversationState.listening:
+        return AppColors.active.withValues(alpha: 0.4);
+      case ConversationState.thinking:
+        return Colors.transparent;
+      case ConversationState.speaking:
+        return AppColors.primary.withValues(alpha: 0.1);
+    }
+  }
+
+  Color _getSplashColor(ConversationState state) {
+    switch (state) {
+      case ConversationState.idle:
+        return AppColors.primary.withValues(alpha: 0.2);
+      case ConversationState.listening:
+        return AppColors.textPrimary.withValues(alpha: 0.15);
+      case ConversationState.speaking:
+        return AppColors.primary.withValues(alpha: 0.2);
+      case ConversationState.thinking:
+        return Colors.transparent;
     }
   }
 
   Widget _buildIcon(ConversationState state) {
     switch (state) {
       case ConversationState.idle:
-        return const Icon(
-          Icons.mic,
-          color: AppColors.textPrimary,
-          size: 36,
-        );
+        return const Icon(Icons.mic, color: AppColors.textPrimary, size: 32);
       case ConversationState.listening:
-        return const Icon(
-          Icons.mic,
-          color: AppColors.textPrimary,
-          size: 36,
-        );
+        return const Icon(Icons.mic, color: AppColors.textPrimary, size: 32);
       case ConversationState.thinking:
         return const SizedBox(
-          width: 28,
-          height: 28,
+          width: 26,
+          height: 26,
           child: CircularProgressIndicator(
             color: AppColors.textSecondary,
             strokeWidth: 2.5,
           ),
         );
       case ConversationState.speaking:
-        return const Icon(
-          Icons.stop,
-          color: AppColors.textSecondary,
-          size: 36,
-        );
+        return const Icon(Icons.stop, color: AppColors.accent, size: 32);
+    }
+  }
+
+  String _getAccessibilityLabel(ConversationState state) {
+    switch (state) {
+      case ConversationState.idle:
+        return 'Start recording';
+      case ConversationState.listening:
+        return 'Stop recording';
+      case ConversationState.thinking:
+        return 'Processing, please wait';
+      case ConversationState.speaking:
+        return 'Interrupt and speak';
     }
   }
 }

@@ -11,46 +11,57 @@ class StatusIndicator extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(conversationStateProvider);
 
-    return SizedBox(
-      height: 40,
-      child: Center(
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 200),
-          child: Row(
-            key: ValueKey(state),
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (state == ConversationState.thinking)
-                const Padding(
-                  padding: EdgeInsets.only(right: 8),
-                  child: SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(
-                      color: AppColors.textSecondary,
-                      strokeWidth: 2,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: SizedBox(
+        height: 32,
+        child: Center(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: Row(
+              key: ValueKey(state),
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (state == ConversationState.thinking)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 8),
+                    child: SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(
+                        color: AppColors.textSecondary,
+                        strokeWidth: 1.5,
+                      ),
                     ),
                   ),
-                ),
-              if (state == ConversationState.listening)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Icon(
-                    Icons.mic,
-                    size: 14,
-                    color: AppColors.active,
+                if (state == ConversationState.listening)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 6),
+                    child: Icon(
+                      Icons.mic,
+                      size: 13,
+                      color: AppColors.active,
+                    ),
+                  ),
+                if (state == ConversationState.speaking)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 6),
+                    child: Icon(
+                      Icons.volume_up,
+                      size: 13,
+                      color: AppColors.accent,
+                    ),
+                  ),
+                Text(
+                  _getStatusText(state),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: _getStatusColor(state),
+                    letterSpacing: 0.4,
                   ),
                 ),
-              Text(
-                _getStatusText(state),
-                style: TextStyle(
-                  fontSize: 14,
-                  color: state == ConversationState.listening
-                      ? AppColors.active
-                      : AppColors.textSecondary,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -67,6 +78,19 @@ class StatusIndicator extends ConsumerWidget {
         return 'Thinking...';
       case ConversationState.speaking:
         return 'Speaking...';
+    }
+  }
+
+  Color _getStatusColor(ConversationState state) {
+    switch (state) {
+      case ConversationState.idle:
+        return AppColors.textSecondary;
+      case ConversationState.listening:
+        return AppColors.active;
+      case ConversationState.thinking:
+        return AppColors.textSecondary;
+      case ConversationState.speaking:
+        return AppColors.accent;
     }
   }
 }

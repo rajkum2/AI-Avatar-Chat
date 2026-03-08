@@ -12,7 +12,8 @@ class TranscriptOverlay extends ConsumerWidget {
     final transcript = ref.watch(transcriptProvider);
     final conversationState = ref.watch(conversationStateProvider);
 
-    if (transcript.isEmpty && conversationState != ConversationState.thinking) {
+    if (transcript.isEmpty &&
+        conversationState != ConversationState.thinking) {
       return const SizedBox.shrink();
     }
 
@@ -22,22 +23,18 @@ class TranscriptOverlay extends ConsumerWidget {
 
     switch (conversationState) {
       case ConversationState.idle:
-        // Show last transcript briefly (AI response lingers)
         displayText = transcript;
         textColor = AppColors.accent;
         fontStyle = FontStyle.normal;
       case ConversationState.listening:
-        // Live user speech — white
         displayText = transcript;
         textColor = AppColors.textPrimary;
         fontStyle = FontStyle.normal;
       case ConversationState.thinking:
-        // Show what user said while waiting
         displayText = transcript.isNotEmpty ? '"$transcript"' : '';
         textColor = AppColors.textSecondary;
         fontStyle = FontStyle.italic;
       case ConversationState.speaking:
-        // AI response text — blue
         displayText = transcript;
         textColor = AppColors.accent;
         fontStyle = FontStyle.normal;
@@ -45,23 +42,27 @@ class TranscriptOverlay extends ConsumerWidget {
 
     if (displayText.isEmpty) return const SizedBox.shrink();
 
+    // Only animate switcher on state changes, not on every partial transcript
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
       child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 200),
+        duration: const Duration(milliseconds: 250),
         child: SingleChildScrollView(
-          key: ValueKey('$conversationState-$displayText'),
+          key: ValueKey(conversationState),
           reverse: true,
-          child: Text(
-            displayText,
+          child: AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 200),
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 15,
               color: textColor,
               fontStyle: fontStyle,
-              height: 1.4,
+              height: 1.5,
             ),
-            textAlign: TextAlign.center,
+            child: Text(
+              displayText,
+              textAlign: TextAlign.center,
+            ),
           ),
         ),
       ),

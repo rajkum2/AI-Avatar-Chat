@@ -5,6 +5,7 @@ class AppColors {
 
   static const Color background = Color(0xFF0F172A);
   static const Color surface = Color(0xFF1E293B);
+  static const Color surfaceLight = Color(0xFF334155);
   static const Color primary = Color(0xFF3B82F6);
   static const Color active = Color(0xFFEF4444);
   static const Color textPrimary = Color(0xFFF8FAFC);
@@ -40,6 +41,10 @@ class AppTheme {
           fontSize: 14,
           color: AppColors.textSecondary,
         ),
+        bodySmall: TextStyle(
+          fontSize: 12,
+          color: AppColors.textSecondary,
+        ),
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.background,
@@ -52,10 +57,24 @@ class AppTheme {
         ),
         iconTheme: IconThemeData(color: AppColors.textSecondary),
       ),
-      snackBarTheme: const SnackBarThemeData(
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          foregroundColor: AppColors.textSecondary,
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
         backgroundColor: AppColors.surface,
-        contentTextStyle: TextStyle(color: AppColors.textPrimary),
+        contentTextStyle: const TextStyle(
+          color: AppColors.textPrimary,
+          fontSize: 14,
+        ),
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: AppColors.surfaceLight.withValues(alpha: 0.5),
+          ),
+        ),
       ),
     );
   }

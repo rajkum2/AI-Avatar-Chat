@@ -173,8 +173,16 @@ Anthropic API supports direct browser access with the `anthropic-dangerous-direc
 - `assets/animations/avatar_speak.json` — Rewritten: mouth with 8-keyframe size animation (lip sync simulation), sound wave bars on left and right (3 bars each, staggered fade in/out), head position bob every 15 frames
 - `lib/features/avatar/avatar_widget.dart` — Full rewrite: `_previousState` tracking to stop thinking controller on state exit, `_buildGlow()` with state-colored AnimatedContainer shadow, `_buildAnimation()` split for thinking vs normal paths, scale+fade AnimatedSwitcher transition, placeholder with CircularProgressIndicator for thinking, labeled placeholders, size clamped 200-400px
 
-- [ ] **Step 7 (NEXT):** Full home screen UI — polish dark theme layout
-- [ ] **Step 8:** Wire ConversationFlow end-to-end
+- [x] **Step 7:** Full home screen UI polished — HomeScreen: added top-to-bottom gradient background (#0F172A→#0B1120), subtle divider under title bar, bottom section gradient overlay for depth, extracted `_buildTitleBar` and `_buildBottomSection` methods. Theme: added `surfaceLight` color, SnackBar shape with rounded corners + border. MicButton: replaced GestureDetector with Material+InkWell for ripple effect + Semantics for accessibility, AnimatedContainer for smooth state transitions, splash color per state, refined shadow/border colors. TranscriptOverlay: fixed janky rebuilds by keying AnimatedSwitcher on state only (not text), added AnimatedDefaultTextStyle for smooth color/style transitions. StatusIndicator: added volume_up icon for speaking state, color-coded status text per state, refined spacing.
+
+### What was changed in Step 7
+- `lib/core/theme.dart` — Added `AppColors.surfaceLight` (#334155), SnackBar shape with RoundedRectangleBorder + border, iconButtonTheme
+- `lib/screens/home_screen.dart` — Gradient background, divider, bottom gradient overlay, extracted builder methods, cleaner spacing
+- `lib/widgets/mic_button.dart` — Material+InkWell for ripple, Semantics labels, AnimatedContainer, splash/shadow/border color helpers, refined sizing (76px)
+- `lib/widgets/transcript_overlay.dart` — AnimatedSwitcher keyed on state only (no more text-based key that caused flicker), AnimatedDefaultTextStyle for smooth style transitions
+- `lib/widgets/status_indicator.dart` — Added volume_up icon for speaking, color-coded text via _getStatusColor, refined spacing
+
+- [ ] **Step 8 (NEXT):** Wire ConversationFlow end-to-end
 - [ ] **Step 9:** Error handling — all 7 error states with SnackBar messages
 - [ ] **Step 10:** End-to-end testing in Chrome
 - [ ] **Step 11:** Interrupt handling — tap mic during speaking
