@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme.dart';
 import '../features/avatar/avatar_widget.dart';
 import '../features/chat/chat_provider.dart';
+import '../features/conversation/conversation_flow.dart';
 import '../widgets/mic_button.dart';
 import '../widgets/transcript_overlay.dart';
 import '../widgets/status_indicator.dart';
@@ -12,6 +13,25 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Listen for error messages and show SnackBar
+    ref.listen<String>(errorMessageProvider, (previous, next) {
+      if (next.isNotEmpty) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(next),
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+          ),
+        );
+        // Clear the error after showing
+        Future.microtask(() {
+          ref.read(errorMessageProvider.notifier).state = '';
+        });
+      }
+    });
+
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -44,6 +64,9 @@ class HomeScreen extends ConsumerWidget {
                             ref
                                 .read(chatHistoryProvider.notifier)
                                 .clearHistory();
+                            ref
+                                .read(conversationStateProvider.notifier)
+                                .resetToIdle();
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Conversation cleared'),
