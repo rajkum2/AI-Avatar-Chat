@@ -18,8 +18,11 @@ final transcriptProvider = StateProvider<String>((ref) => '');
 
 final aiResponseProvider = StateProvider<String>((ref) => '');
 
-// Provides error messages for SnackBar display
+// Provides error messages for SnackBar display (auto-dismissing)
 final errorMessageProvider = StateProvider<String>((ref) => '');
+
+// Provides persistent error messages for banner display (user must dismiss)
+final persistentErrorProvider = StateProvider<String>((ref) => '');
 
 class ConversationNotifier extends StateNotifier<ConversationState> {
   final Ref _ref;
@@ -39,6 +42,10 @@ class ConversationNotifier extends StateNotifier<ConversationState> {
     _ref.read(errorMessageProvider.notifier).state = message;
   }
 
+  void _showPersistentError(String message) {
+    _ref.read(persistentErrorProvider.notifier).state = message;
+  }
+
   Future<void> startListening() async {
     if (state == ConversationState.speaking) {
       await interrupt();
@@ -54,16 +61,16 @@ class ConversationNotifier extends StateNotifier<ConversationState> {
       final available = await sttService.initialize();
       if (!available) {
         if (kIsWeb) {
-          _showError('Browser not supported — please use Chrome');
+          _showPersistentError('Browser not supported — please use Chrome');
         } else {
-          _showError('Microphone not available');
+          _showPersistentError('Microphone not available');
         }
         return;
       }
     }
 
     if (!sttService.isAvailable) {
-      _showError('Microphone not available');
+      _showPersistentError('Microphone not available');
       return;
     }
 
@@ -92,7 +99,12 @@ class ConversationNotifier extends StateNotifier<ConversationState> {
     // Listen for STT errors
     _errorSub?.cancel();
     _errorSub = sttService.errorStream.listen((errorMsg) {
-      _showError(errorMsg);
+      // Permission denied gets a persistent banner; others get a SnackBar
+      if (errorMsg.contains('permission') || errorMsg.contains('not available')) {
+        _showPersistentError(errorMsg);
+      } else {
+        _showError(errorMsg);
+      }
       if (state == ConversationState.listening) {
         _cancelListenSubscriptions();
         state = ConversationState.idle;
@@ -122,6 +134,7 @@ class ConversationNotifier extends StateNotifier<ConversationState> {
 
   Future<void> _onSpeechResult(String transcript) async {
     _cancelListenSubscriptions();
+    final pipelineStopwatch = Stopwatch()..start();
 
     if (transcript.trim().isEmpty) {
       _ref.read(transcriptProvider.notifier).state = '';
@@ -166,6 +179,12 @@ class ConversationNotifier extends StateNotifier<ConversationState> {
       _ref.read(transcriptProvider.notifier).state = reply;
 
       // Transition to SPEAKING
+      pipelineStopwatch.stop();
+      debugPrint(
+        'Pipeline: STT→Claude complete in '
+        '${pipelineStopwatch.elapsedMilliseconds}ms',
+      );
+
       state = ConversationState.speaking;
       _updateAvatarState();
 

@@ -182,9 +182,44 @@ Anthropic API supports direct browser access with the `anthropic-dangerous-direc
 - `lib/widgets/transcript_overlay.dart` — AnimatedSwitcher keyed on state only (no more text-based key that caused flicker), AnimatedDefaultTextStyle for smooth style transitions
 - `lib/widgets/status_indicator.dart` — Added volume_up icon for speaking, color-coded text via _getStatusColor, refined spacing
 
-- [ ] **Step 8 (NEXT):** Wire ConversationFlow end-to-end
-- [ ] **Step 9:** Error handling — all 7 error states with SnackBar messages
-- [ ] **Step 10:** End-to-end testing in Chrome
+- [x] **Step 8:** Wired end-to-end — Fixed critical bugs: removed custom `TimeoutException` that shadowed `dart:async.TimeoutException` (catch clause never matched), added `_finalResultSent` guard in STTService to prevent double-fire race condition between `onResult(finalResult)` and `onStatus('done')`, added `_sendFinalResult()` method called from all 3 paths (onResult, onStatus, onError). Added pipeline latency logging (`Pipeline: STT→Claude complete in Xms`). Added startup API key warning — `_AppInitializer` checks `Env.hasAnthropicKey` after init and shows SnackBar if missing.
+
+### What was changed in Step 8
+- `lib/features/chat/chat_service.dart` — Removed custom `TimeoutException` class, catch `e.toString().contains('TimeoutException')` instead
+- `lib/features/voice/stt_service.dart` — Added `_finalResultSent` bool guard, `_sendFinalResult()` method, all 3 paths (onResult final, onStatus done, onError) route through it to prevent double-fire
+- `lib/features/conversation/conversation_flow.dart` — Added `Stopwatch` pipeline latency logging from speech result to speaking state
+- `lib/main.dart` — Added API key check on startup, shows SnackBar warning if ANTHROPIC_API_KEY is missing/placeholder
+
+### Full Pipeline (verified wiring)
+```
+1. User taps mic → ConversationNotifier.startListening()
+2. STT streams partial results → transcriptProvider updates → TranscriptOverlay shows live text
+3. Silence/tap → STTService._sendFinalResult() → ConversationNotifier._onSpeechResult()
+4. Env.hasAnthropicKey check → THINKING state → Avatar + Status + MicButton update
+5. ChatService.sendMessage() → Claude API with history → response parsed
+6. Reply stored in chatHistoryProvider + aiResponseProvider + transcriptProvider
+7. SPEAKING state → TTS.speak() → Avatar animates → TranscriptOverlay shows AI text in blue
+8. TTS completion → IDLE state → all UI resets
+```
+
+- [x] **Step 9:** Error handling — all 7 error states implemented with proper severity. Added `persistentErrorProvider` for critical errors (mic permission denied, browser not supported) that show as a red-tinted banner with dismiss button at the top of HomeScreen. Transient errors (empty transcript, connection issues, API errors) remain as auto-dismissing SnackBars. Early browser detection on startup via STT init result — if STT unavailable on web, persistent banner appears immediately. Error routing: permission/availability errors → persistent banner, all others → SnackBar.
+
+### What was changed in Step 9
+- `lib/features/conversation/conversation_flow.dart` — Added `persistentErrorProvider` StateProvider, `_showPersistentError()` method, browser/permission/availability errors now route to persistent banner instead of SnackBar
+- `lib/screens/home_screen.dart` — Added `_buildErrorBanner()` widget: red-tinted full-width banner with warning icon, error text, and dismiss (close) button. Watches `persistentErrorProvider` and shows between title bar and avatar
+- `lib/main.dart` — Added `kIsWeb` import, early browser detection: if STT init fails on web, sets `persistentErrorProvider` with "Browser not supported" message
+
+### Error States Coverage (7/7)
+| # | Error | Trigger | Display | Status |
+|---|-------|---------|---------|--------|
+| 1 | Microphone permission denied | STT error_permission | Persistent banner | ✅ |
+| 2 | Couldn't hear you — please try again | Empty transcript | SnackBar (3s) | ✅ |
+| 3 | Connection lost — check your internet | Network failure | SnackBar (3s) | ✅ |
+| 4 | Claude is busy — trying again in 2s | HTTP 429 | SnackBar + auto-retry | ✅ |
+| 5 | Something went wrong — please try again | HTTP 500+ | SnackBar (3s) | ✅ |
+| 6 | Your session expired — starting fresh | JWT expired | Phase 2 (skipped) | ⬜ |
+| 7 | Browser not supported — please use Chrome | Web Speech API missing | Persistent banner | ✅ |
+- [ ] **Step 10 (NEXT):** End-to-end testing in Chrome
 - [ ] **Step 11:** Interrupt handling — tap mic during speaking
 - [ ] **Step 12:** Performance optimization — measure latency, streaming
 - [ ] **Step 13:** Firebase Hosting deploy

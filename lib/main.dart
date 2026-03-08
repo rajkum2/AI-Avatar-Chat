@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/env.dart';
 import 'core/theme.dart';
+import 'features/conversation/conversation_flow.dart';
 import 'features/voice/stt_service.dart';
 import 'features/voice/tts_service.dart';
 import 'screens/home_screen.dart';
@@ -48,7 +50,28 @@ class _AppInitializerState extends ConsumerState<_AppInitializer> {
 
     // Pre-initialize STT so mic permission prompt shows early
     final stt = ref.read(sttServiceProvider);
-    await stt.initialize();
+    final sttAvailable = await stt.initialize();
+
+    // If STT not available on web, likely unsupported browser
+    if (!sttAvailable && kIsWeb && mounted) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          ref.read(persistentErrorProvider.notifier).state =
+              'Browser not supported — please use Chrome';
+        }
+      });
+    }
+
+    // Warn if API key is missing after everything is loaded
+    if (!Env.hasAnthropicKey && mounted) {
+      // Delay to let the UI build first
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          ref.read(errorMessageProvider.notifier).state =
+              'API key not set — add ANTHROPIC_API_KEY to .env file';
+        }
+      });
+    }
   }
 
   @override

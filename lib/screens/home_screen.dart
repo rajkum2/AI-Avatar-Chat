@@ -34,6 +34,8 @@ class HomeScreen extends ConsumerWidget {
       }
     });
 
+    final persistentError = ref.watch(persistentErrorProvider);
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -60,6 +62,10 @@ class HomeScreen extends ConsumerWidget {
                   color: AppColors.surfaceLight.withValues(alpha: 0.2),
                 ),
               ),
+
+              // ── Persistent error banner ──
+              if (persistentError.isNotEmpty)
+                _buildErrorBanner(persistentError, ref),
 
               // ── Avatar area — 55% ──
               const Expanded(
@@ -118,6 +124,43 @@ class HomeScreen extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildErrorBanner(String message, WidgetRef ref) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      color: AppColors.active.withValues(alpha: 0.15),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.warning_amber_rounded,
+            size: 18,
+            color: AppColors.active,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: () {
+              ref.read(persistentErrorProvider.notifier).state = '';
+            },
+            child: const Icon(
+              Icons.close,
+              size: 16,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
       ),
     );
   }

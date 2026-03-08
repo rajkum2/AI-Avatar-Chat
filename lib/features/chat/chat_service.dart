@@ -88,10 +88,11 @@ class ChatService {
       }
     } on ChatException {
       rethrow;
-    } on TimeoutException {
-      throw ChatException('Connection timed out — please try again');
     } catch (e) {
       debugPrint('Claude API error: $e');
+      if (e.toString().contains('TimeoutException')) {
+        throw ChatException('Connection timed out — please try again');
+      }
       throw ChatException('Connection lost — check your internet');
     }
   }
@@ -174,9 +175,4 @@ class ChatException implements Exception {
 
 class ChatRateLimitException extends ChatException {
   ChatRateLimitException(super.message);
-}
-
-class TimeoutException implements Exception {
-  final String message;
-  TimeoutException(this.message);
 }

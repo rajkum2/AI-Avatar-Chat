@@ -13,6 +13,7 @@ class STTService {
   bool _isAvailable = false;
   bool _isListening = false;
   bool _initialized = false;
+  bool _finalResultSent = false;
 
   final _transcriptController = StreamController<String>.broadcast();
   final _finalResultController = StreamController<String>.broadcast();
@@ -39,11 +40,10 @@ class STTService {
 
           if (error.errorMsg == 'error_no_match' ||
               error.errorMsg == 'error_speech_timeout') {
-            // No speech detected — send last partial or empty
-            _finalResultController.add(_lastPartialResult);
+            _sendFinalResult(_lastPartialResult);
           } else if (error.permanent) {
             _errorController.add(_mapErrorMessage(error.errorMsg));
-            _finalResultController.add('');
+            _sendFinalResult('');
           }
         },
         onStatus: (status) {
@@ -53,10 +53,8 @@ class STTService {
               _isListening = false;
               // If status changes to done without a final result,
               // send the last partial result we captured
-              if (_lastPartialResult.isNotEmpty) {
-                _finalResultController.add(_lastPartialResult);
-                _lastPartialResult = '';
-              }
+              _sendFinalResult(_lastPartialResult);
+              _lastPartialResult = '';
             }
           }
         },
@@ -77,6 +75,7 @@ class STTService {
 
     _isListening = true;
     _lastPartialResult = '';
+    _finalResultSent = false;
 
     try {
       await _speech.listen(
@@ -87,7 +86,7 @@ class STTService {
           if (result.finalResult) {
             _isListening = false;
             _lastPartialResult = '';
-            _finalResultController.add(words);
+            _sendFinalResult(words);
           } else {
             _lastPartialResult = words;
           }
@@ -118,6 +117,14 @@ class STTService {
       debugPrint('STT stop error: $e');
     }
     _isListening = false;
+  }
+
+  /// Sends the final result exactly once per listen session.
+  void _sendFinalResult(String text) {
+    if (_finalResultSent) return;
+    _finalResultSent = true;
+    debugPrint('STT: Final result (${text.length} chars): "$text"');
+    _finalResultController.add(text);
   }
 
   String _mapErrorMessage(String errorMsg) {
