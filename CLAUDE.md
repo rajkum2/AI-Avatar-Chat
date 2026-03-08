@@ -145,11 +145,26 @@ SPEAKING → IDLE → LISTEN : interrupt()            [mic tap during speech]
 ANY → IDLE               : resetToIdle()          [clear conversation]
 ```
 
+- [x] **Step 4:** Claude API integration — Hardened chat_service.dart with: `anthropic-dangerous-direct-browser-access` header for Flutter Web CORS, message alternation validation (strips consecutive same-role messages), detailed error handling for all HTTP codes (400/401/403/404/429/500/529), response parsing with usage logging, latency measurement via Stopwatch, TimeoutException handling. Fixed env.dart: graceful .env load failure, placeholder key detection (`hasAnthropicKey` checks for `your_..._here`). Added early API key check in conversation_flow before THINKING state. Updated web/index.html with proper title and viewport meta.
+
+### What was changed in Step 4
+- `lib/features/chat/chat_service.dart` — Full rewrite: CORS header, message validation, granular error codes, `_parseResponse()` with usage logging, `_handleErrorResponse()` returns `Never`, Stopwatch latency logging
+- `lib/core/env.dart` — Graceful .env load with try/catch, `_loaded` flag, placeholder detection in `hasAnthropicKey`/`hasElevenLabsKey`
+- `lib/features/conversation/conversation_flow.dart` — Early `Env.hasAnthropicKey` check before THINKING, import added for env.dart
+- `web/index.html` — Updated title to "AI Avatar Chat", added viewport meta, updated description
+
+### CORS Note for Development
+Anthropic API supports direct browser access with the `anthropic-dangerous-direct-browser-access: true` header. This works for development. For production, use a backend proxy (Phase 2, Step 15).
+
+- [x] **Step 5:** TTS (flutter_tts) hardened — Added: init guard (`_initialized` flag), web-specific `awaitSpeakCompletion(true)`, start/cancel/error handlers with debug logging, fallback timer for web (estimates duration from word count at TTS rate + 2s buffer, fires `_onSpeakComplete` if completion handler never fires), available voice enumeration in debug mode, `_onSpeakComplete` dedup guard. Pre-initialization: `main.dart` now uses `_AppInitializer` ConsumerStatefulWidget that eagerly inits both TTS and STT on app startup (mic permission prompt shows early, TTS ready for first response). Removed redundant `ttsService.initialize()` from conversation_flow.
+
+### What was changed in Step 5
+- `lib/features/voice/tts_service.dart` — Full rewrite: init guard, web-specific config, start/cancel/error handlers, fallback timer, voice logging, `_onSpeakComplete` dedup
+- `lib/main.dart` — Added `_AppInitializer` widget that pre-initializes STT + TTS services on app startup via `ConsumerStatefulWidget.initState`
+- `lib/features/conversation/conversation_flow.dart` — Removed `ttsService.initialize()` call (now done at startup)
+
 ### Remaining Steps
-- [ ] **Step 4 (NEXT):** Claude API integration — test real API calls, verify response parsing
-- [ ] **Step 4:** Claude API integration — test real API calls, verify response parsing
-- [ ] **Step 5:** TTS (flutter_tts) — AI reply spoken aloud
-- [ ] **Step 6:** Lottie avatar — animates per conversation state
+- [ ] **Step 6 (NEXT):** Lottie avatar — animates per conversation state
 - [ ] **Step 7:** Full home screen UI — polish dark theme layout
 - [ ] **Step 8:** Wire ConversationFlow end-to-end
 - [ ] **Step 9:** Error handling — all 7 error states with SnackBar messages
@@ -167,3 +182,4 @@ When resuming this project in a new session:
 2. Check this file's "Development Progress" section for current step
 3. Run `flutter run -d chrome --web-port 8080` to see current state
 4. Continue from the next unchecked step
+5. For Claude API testing, ensure `.env` has a real `ANTHROPIC_API_KEY`

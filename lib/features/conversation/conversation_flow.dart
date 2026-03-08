@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/env.dart';
 import 'conversation_state.dart';
 import '../avatar/avatar_controller.dart';
 import '../voice/stt_service.dart';
@@ -130,6 +131,14 @@ class ConversationNotifier extends StateNotifier<ConversationState> {
       return;
     }
 
+    // Check API key before making the call
+    if (!Env.hasAnthropicKey) {
+      _showError('API key not configured — add ANTHROPIC_API_KEY to .env');
+      state = ConversationState.idle;
+      _updateAvatarState();
+      return;
+    }
+
     // Transition to THINKING
     state = ConversationState.thinking;
     _updateAvatarState();
@@ -161,9 +170,6 @@ class ConversationNotifier extends StateNotifier<ConversationState> {
       _updateAvatarState();
 
       final ttsService = _ref.read(ttsServiceProvider);
-
-      // Initialize TTS if needed
-      await ttsService.initialize();
 
       // Listen for TTS completion
       _ttsCompletionSub?.cancel();
