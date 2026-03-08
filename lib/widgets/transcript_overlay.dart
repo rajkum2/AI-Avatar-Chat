@@ -12,23 +12,57 @@ class TranscriptOverlay extends ConsumerWidget {
     final transcript = ref.watch(transcriptProvider);
     final conversationState = ref.watch(conversationStateProvider);
 
-    if (transcript.isEmpty) return const SizedBox.shrink();
+    if (transcript.isEmpty && conversationState != ConversationState.thinking) {
+      return const SizedBox.shrink();
+    }
 
-    final bool isAiText = conversationState == ConversationState.speaking;
+    final String displayText;
+    final Color textColor;
+    final FontStyle fontStyle;
+
+    switch (conversationState) {
+      case ConversationState.idle:
+        // Show last transcript briefly (AI response lingers)
+        displayText = transcript;
+        textColor = AppColors.accent;
+        fontStyle = FontStyle.normal;
+      case ConversationState.listening:
+        // Live user speech — white
+        displayText = transcript;
+        textColor = AppColors.textPrimary;
+        fontStyle = FontStyle.normal;
+      case ConversationState.thinking:
+        // Show what user said while waiting
+        displayText = transcript.isNotEmpty ? '"$transcript"' : '';
+        textColor = AppColors.textSecondary;
+        fontStyle = FontStyle.italic;
+      case ConversationState.speaking:
+        // AI response text — blue
+        displayText = transcript;
+        textColor = AppColors.accent;
+        fontStyle = FontStyle.normal;
+    }
+
+    if (displayText.isEmpty) return const SizedBox.shrink();
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      child: SingleChildScrollView(
-        reverse: true,
-        child: Text(
-          transcript,
-          style: TextStyle(
-            fontSize: 16,
-            color: isAiText ? AppColors.accent : AppColors.textPrimary,
-            height: 1.4,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        child: SingleChildScrollView(
+          key: ValueKey('$conversationState-$displayText'),
+          reverse: true,
+          child: Text(
+            displayText,
+            style: TextStyle(
+              fontSize: 16,
+              color: textColor,
+              fontStyle: fontStyle,
+              height: 1.4,
+            ),
+            textAlign: TextAlign.center,
           ),
-          textAlign: TextAlign.left,
         ),
       ),
     );

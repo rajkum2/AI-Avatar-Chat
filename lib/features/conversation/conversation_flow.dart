@@ -208,6 +208,11 @@ class ConversationNotifier extends StateNotifier<ConversationState> {
     _cancelListenSubscriptions();
     _ttsCompletionSub?.cancel();
     _processingResult = false;
+
+    // Stop any active STT or TTS
+    _ref.read(sttServiceProvider).stop();
+    _ref.read(ttsServiceProvider).stop();
+
     _ref.read(transcriptProvider.notifier).state = '';
     state = ConversationState.idle;
     _updateAvatarState();

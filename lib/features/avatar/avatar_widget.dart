@@ -4,11 +4,31 @@ import 'package:lottie/lottie.dart';
 import 'avatar_controller.dart';
 import 'avatar_state.dart';
 
-class AvatarWidget extends ConsumerWidget {
+class AvatarWidget extends ConsumerStatefulWidget {
   const AvatarWidget({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AvatarWidget> createState() => _AvatarWidgetState();
+}
+
+class _AvatarWidgetState extends ConsumerState<AvatarWidget>
+    with TickerProviderStateMixin {
+  late AnimationController _animationController;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final avatarState = ref.watch(avatarStateProvider);
 
     return LayoutBuilder(
@@ -30,42 +50,31 @@ class AvatarWidget extends ConsumerWidget {
 
   Widget _buildAnimation(AvatarState state) {
     final String assetPath;
-    final bool animate;
-    final double speed;
 
     switch (state) {
       case AvatarState.idle:
         assetPath = 'assets/animations/avatar_idle.json';
-        animate = true;
-        speed = 1.0;
       case AvatarState.listening:
         assetPath = 'assets/animations/avatar_listen.json';
-        animate = true;
-        speed = 1.0;
       case AvatarState.speaking:
         assetPath = 'assets/animations/avatar_speak.json';
-        animate = true;
-        speed = 1.0;
       case AvatarState.thinking:
         assetPath = 'assets/animations/avatar_idle.json';
-        animate = true;
-        speed = 0.5;
     }
 
     return Lottie.asset(
       assetPath,
-      animate: animate,
+      controller: state == AvatarState.thinking ? _animationController : null,
+      animate: state != AvatarState.thinking,
       repeat: true,
       fit: BoxFit.contain,
-      delegates: LottieDelegates(
-        values: [
-          if (speed != 1.0)
-            ValueDelegate.transformOpacity(
-              const ['**'],
-              value: (speed * 100).round(),
-            ),
-        ],
-      ),
+      onLoaded: (composition) {
+        if (state == AvatarState.thinking) {
+          _animationController
+            ..duration = composition.duration * 2 // Half speed
+            ..repeat();
+        }
+      },
       errorBuilder: (context, error, stackTrace) {
         return _buildPlaceholder(state);
       },

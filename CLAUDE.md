@@ -124,8 +124,29 @@ ELEVENLABS_VOICE_ID=...
 - `lib/features/conversation/conversation_flow.dart` — Added `errorMessageProvider`, STT error subscription, TTS init call, `_processingResult` guard, browser detection for error messages
 - `lib/screens/home_screen.dart` — Added `ref.listen` for errorMessageProvider → SnackBar display, clear conversation also resets state
 
+- [x] **Step 3:** State machine verified — All 9 transition paths audited and correct. Fixed: AvatarWidget converted to ConsumerStatefulWidget with AnimationController for proper Lottie speed control (thinking = 0.5x via doubled duration). StatusIndicator enhanced with animated transitions, spinner for thinking, mic icon for listening, color changes. TranscriptOverlay now shows italic quoted user text during thinking, AI text in blue during speaking. resetToIdle now stops active STT/TTS services. 0 analyzer issues, web build passes.
+
+### What was changed in Step 3
+- `lib/features/avatar/avatar_widget.dart` — Converted to ConsumerStatefulWidget with TickerProviderStateMixin. AnimationController for Lottie speed control: thinking state doubles animation duration for half-speed effect. Removed broken LottieDelegates opacity hack.
+- `lib/widgets/status_indicator.dart` — Added AnimatedSwitcher for smooth text transitions. Added spinner icon during thinking, mic icon during listening, color-coded text (red for listening, gray for others).
+- `lib/widgets/transcript_overlay.dart` — State-aware display: listening = white user text, thinking = italic gray quoted text, speaking = blue AI text, idle = lingering AI text. Added AnimatedSwitcher for transitions.
+- `lib/features/conversation/conversation_flow.dart` — resetToIdle() now calls sttService.stop() and ttsService.stop() to clean up active services.
+
+### State Machine Transition Map (verified)
+```
+IDLE → LISTENING         : startListening()      [mic tap]
+LISTENING → THINKING     : _onSpeechResult()     [speech done / silence]
+LISTENING → IDLE         : _onSpeechResult()     [empty transcript]
+LISTENING → IDLE         : error listener         [STT error]
+THINKING → SPEAKING      : _onSpeechResult()     [Claude reply received]
+THINKING → IDLE          : catch blocks           [API error]
+SPEAKING → IDLE          : TTS completion          [audio finished]
+SPEAKING → IDLE → LISTEN : interrupt()            [mic tap during speech]
+ANY → IDLE               : resetToIdle()          [clear conversation]
+```
+
 ### Remaining Steps
-- [ ] **Step 3:** Conversation state machine — verify states switch correctly via UI
+- [ ] **Step 4 (NEXT):** Claude API integration — test real API calls, verify response parsing
 - [ ] **Step 4:** Claude API integration — test real API calls, verify response parsing
 - [ ] **Step 5:** TTS (flutter_tts) — AI reply spoken aloud
 - [ ] **Step 6:** Lottie avatar — animates per conversation state

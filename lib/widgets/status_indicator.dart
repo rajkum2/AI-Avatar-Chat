@@ -14,11 +14,43 @@ class StatusIndicator extends ConsumerWidget {
     return SizedBox(
       height: 40,
       child: Center(
-        child: Text(
-          _getStatusText(state),
-          style: const TextStyle(
-            fontSize: 14,
-            color: AppColors.textSecondary,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          child: Row(
+            key: ValueKey(state),
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (state == ConversationState.thinking)
+                const Padding(
+                  padding: EdgeInsets.only(right: 8),
+                  child: SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      color: AppColors.textSecondary,
+                      strokeWidth: 2,
+                    ),
+                  ),
+                ),
+              if (state == ConversationState.listening)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Icon(
+                    Icons.mic,
+                    size: 14,
+                    color: AppColors.active,
+                  ),
+                ),
+              Text(
+                _getStatusText(state),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: state == ConversationState.listening
+                      ? AppColors.active
+                      : AppColors.textSecondary,
+                ),
+              ),
+            ],
           ),
         ),
       ),
