@@ -165,7 +165,15 @@ Anthropic API supports direct browser access with the `anthropic-dangerous-direc
 
 ### Remaining Steps
 - [ ] **Step 6 (NEXT):** Lottie avatar — animates per conversation state
-- [ ] **Step 7:** Full home screen UI — polish dark theme layout
+- [x] **Step 6:** Lottie avatar — Rebuilt all 3 Lottie JSON animations with richer detail: idle has breathing bob + eye blink at frame 85-92 + glow ring; listen has expanding pulse rings + head tilt rotation + wider eyes; speak has animated mouth (8-keyframe open/close cycle) + sound wave bars on both sides + head bob. AvatarWidget fixed: thinking controller now properly stops/resets when leaving thinking state via `_previousState` tracking, split into `_buildAvatar` with glow layer + animation layer, AnimatedSwitcher uses scale+fade transition, size clamped to 200-400px, placeholder improved with spinner overlay for thinking + labeled states.
+
+### What was changed in Step 6
+- `assets/animations/avatar_idle.json` — Rewritten: oval head shape with border stroke, eyes with blink keyframes (frames 85-92 scaleY→10%), subtle breathing position bob, outer glow ring with opacity pulse
+- `assets/animations/avatar_listen.json` — Rewritten: 2 expanding pulse rings (staggered timing, fade to 0), head with subtle tilt rotation (±3°), wider open eyes (scaleY 110%), small open mouth, brighter ring
+- `assets/animations/avatar_speak.json` — Rewritten: mouth with 8-keyframe size animation (lip sync simulation), sound wave bars on left and right (3 bars each, staggered fade in/out), head position bob every 15 frames
+- `lib/features/avatar/avatar_widget.dart` — Full rewrite: `_previousState` tracking to stop thinking controller on state exit, `_buildGlow()` with state-colored AnimatedContainer shadow, `_buildAnimation()` split for thinking vs normal paths, scale+fade AnimatedSwitcher transition, placeholder with CircularProgressIndicator for thinking, labeled placeholders, size clamped 200-400px
+
+- [ ] **Step 7 (NEXT):** Full home screen UI — polish dark theme layout
 - [ ] **Step 8:** Wire ConversationFlow end-to-end
 - [ ] **Step 9:** Error handling — all 7 error states with SnackBar messages
 - [ ] **Step 10:** End-to-end testing in Chrome
