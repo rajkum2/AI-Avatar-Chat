@@ -12,20 +12,29 @@ class Env {
       _loaded = true;
       debugPrint('Env: .env loaded successfully');
 
-      if (!hasAnthropicKey) {
-        debugPrint('Env: WARNING — ANTHROPIC_API_KEY is not set in .env');
+      if (!hasKimiKey && !useBackend) {
+        debugPrint('Env: WARNING — KIMI_API_KEY is not set in .env');
       }
     } catch (e) {
       debugPrint('Env: Could not load .env file: $e');
-      debugPrint('Env: Create a .env file with ANTHROPIC_API_KEY=your_key');
+      debugPrint('Env: Create a .env file with required API keys');
       _loaded = false;
     }
   }
 
   static bool get isLoaded => _loaded;
 
-  static String get anthropicApiKey =>
-      dotenv.env['ANTHROPIC_API_KEY'] ?? '';
+  // Backend API URL (for Phase 2)
+  static String get backendUrl =>
+      dotenv.env['BACKEND_URL'] ?? 'http://localhost:3000';
+
+  // Feature flags
+  static bool get useBackend =>
+      dotenv.env['USE_BACKEND']?.toLowerCase() == 'true';
+
+  // Direct API keys (fallback when not using backend)
+  static String get kimiApiKey =>
+      dotenv.env['KIMI_API_KEY'] ?? '';
 
   static String get elevenLabsApiKey =>
       dotenv.env['ELEVENLABS_API_KEY'] ?? '';
@@ -33,11 +42,16 @@ class Env {
   static String get elevenLabsVoiceId =>
       dotenv.env['ELEVENLABS_VOICE_ID'] ?? '';
 
-  static bool get hasAnthropicKey =>
-      anthropicApiKey.isNotEmpty &&
-      anthropicApiKey != 'your_anthropic_api_key_here';
+  // Validation
+  static bool get hasKimiKey =>
+      kimiApiKey.isNotEmpty &&
+      kimiApiKey != 'your_kimi_api_key_here';
 
   static bool get hasElevenLabsKey =>
       elevenLabsApiKey.isNotEmpty &&
       elevenLabsApiKey != 'your_elevenlabs_api_key_here';
+
+  static bool get hasBackendUrl =>
+      backendUrl.isNotEmpty &&
+      !backendUrl.contains('localhost');
 }

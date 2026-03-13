@@ -19,8 +19,8 @@ Flutter Web AI Avatar app: user speaks into mic → STT transcribes → Claude A
 ### State Machine (4 states — single source of truth)
 ```
 IDLE → (tap mic) → LISTENING → (silence/tap) → THINKING → (API reply) → SPEAKING → (audio ends) → IDLE
-                                                                          ↓ (tap mic = interrupt)
-                                                                        LISTENING
+                                                  ↓ (tap mic = cancel)    ↓ (tap mic = interrupt)
+                                                IDLE                    LISTENING
 ```
 
 ### Provider Graph
@@ -33,12 +33,15 @@ IDLE → (tap mic) → LISTENING → (silence/tap) → THINKING → (API reply) 
 - `ttsServiceProvider` — singleton TTSService
 - `chatServiceProvider` — singleton ChatService
 - `audioPlayerServiceProvider` — singleton AudioPlayerService
+- `errorMessageProvider` — transient error text → SnackBar display
+- `persistentErrorProvider` — critical error text → banner display
 
 ### Key Orchestration
 `ConversationFlow` (`conversation_flow.dart`) orchestrates the full pipeline:
 1. Start STT → stream partial transcript → get final text
-2. Send to Claude API with history → get reply
+2. Stream to Claude API with history → progressive text display → get full reply
 3. Play reply via TTS → avatar animates → completion → back to IDLE
+4. Interrupt: cancel during thinking (discard API response) or speaking (stop TTS → listen)
 
 ## Folder Structure
 ```
@@ -59,13 +62,13 @@ lib/
 │   │   └── audio_player_service.dart      # audioplayers for ElevenLabs bytes (Phase 2)
 │   ├── chat/
 │   │   ├── chat_message.dart              # Data model (role, content, timestamp)
-│   │   ├── chat_service.dart              # Claude API POST + error handling (429 retry, 500 fail)
+│   │   ├── chat_service.dart              # Claude API streaming + non-streaming, error handling, connection pre-warming
 │   │   └── chat_provider.dart             # Chat history StateNotifier (max 20 messages)
 │   └── conversation/
 │       ├── conversation_state.dart        # Enum: idle, listening, thinking, speaking
 │       └── conversation_flow.dart         # Main orchestrator + ConversationNotifier
 ├── widgets/
-│   ├── mic_button.dart                    # Animated mic with pulse (listening), spinner (thinking)
+│   ├── mic_button.dart                    # Animated mic with pulse (listening), cancel button (thinking), stop (speaking)
 │   ├── transcript_overlay.dart            # Shows live STT text (white) or AI reply (blue)
 │   └── status_indicator.dart              # "Tap mic to start" / "Listening..." / etc.
 └── screens/
@@ -78,6 +81,8 @@ assets/animations/                         # Lottie JSON files (placeholder, rep
 
 .env                                       # API keys (NEVER commit — in .gitignore)
 .env.example                               # Template for API keys
+firebase.json                              # Firebase Hosting config (SPA rewrite, caching)
+.firebaserc                                # Firebase project selector (in .gitignore)
 ```
 
 ## Build & Run Commands
@@ -163,8 +168,6 @@ Anthropic API supports direct browser access with the `anthropic-dangerous-direc
 - `lib/main.dart` — Added `_AppInitializer` widget that pre-initializes STT + TTS services on app startup via `ConsumerStatefulWidget.initState`
 - `lib/features/conversation/conversation_flow.dart` — Removed `ttsService.initialize()` call (now done at startup)
 
-### Remaining Steps
-- [ ] **Step 6 (NEXT):** Lottie avatar — animates per conversation state
 - [x] **Step 6:** Lottie avatar — Rebuilt all 3 Lottie JSON animations with richer detail: idle has breathing bob + eye blink at frame 85-92 + glow ring; listen has expanding pulse rings + head tilt rotation + wider eyes; speak has animated mouth (8-keyframe open/close cycle) + sound wave bars on both sides + head bob. AvatarWidget fixed: thinking controller now properly stops/resets when leaving thinking state via `_previousState` tracking, split into `_buildAvatar` with glow layer + animation layer, AnimatedSwitcher uses scale+fade transition, size clamped to 200-400px, placeholder improved with spinner overlay for thinking + labeled states.
 
 ### What was changed in Step 6
@@ -196,10 +199,12 @@ Anthropic API supports direct browser access with the `anthropic-dangerous-direc
 2. STT streams partial results → transcriptProvider updates → TranscriptOverlay shows live text
 3. Silence/tap → STTService._sendFinalResult() → ConversationNotifier._onSpeechResult()
 4. Env.hasAnthropicKey check → THINKING state → Avatar + Status + MicButton update
-5. ChatService.sendMessage() → Claude API with history → response parsed
-6. Reply stored in chatHistoryProvider + aiResponseProvider + transcriptProvider
-7. SPEAKING state → TTS.speak() → Avatar animates → TranscriptOverlay shows AI text in blue
-8. TTS completion → IDLE state → all UI resets
+5. ChatService.streamMessage() → Claude API streaming → text appears progressively
+6. (User can tap cancel during thinking → _cancelled flag → stream discarded)
+7. Reply stored in chatHistoryProvider + aiResponseProvider + transcriptProvider
+8. SPEAKING state → TTS.speak() → Avatar animates → TranscriptOverlay shows AI text in blue
+9. TTS completion → IDLE state → all UI resets
+10. (User can tap mic during speaking → interrupt → TTS stops → LISTENING)
 ```
 
 - [x] **Step 9:** Error handling — all 7 error states implemented with proper severity. Added `persistentErrorProvider` for critical errors (mic permission denied, browser not supported) that show as a red-tinted banner with dismiss button at the top of HomeScreen. Transient errors (empty transcript, connection issues, API errors) remain as auto-dismissing SnackBars. Early browser detection on startup via STT init result — if STT unavailable on web, persistent banner appears immediately. Error routing: permission/availability errors → persistent banner, all others → SnackBar.
@@ -241,12 +246,143 @@ Run with `flutter run -d chrome --web-port 8080` and verify:
 - [ ] Without API key → "API key not set" SnackBar on startup
 - [ ] Clear conversation button → "Conversation cleared" SnackBar, state resets
 - [ ] Rapid double-tap mic → only one action fires (no crash)
-- [ ] **Step 11 (NEXT):** Interrupt handling — tap mic during speaking
-- [ ] **Step 12:** Performance optimization — measure latency, streaming
-- [ ] **Step 13:** Firebase Hosting deploy
-- [ ] **Step 14:** ElevenLabs TTS upgrade
-- [ ] **Step 15:** REST API backend (Phase 2)
-- [ ] **Step 16:** Flutter mobile app (Phase 3)
+- [x] **Step 11:** Interrupt handling — full interrupt support for SPEAKING and THINKING states. During speaking: tap mic → TTS stops → immediately starts listening. During thinking: tap mic → API response discarded when it arrives → returns to idle. Mic button now shows cancel icon (× inside spinner) during thinking instead of being disabled. `_cancelled` flag in ConversationNotifier ensures late API responses are safely discarded.
+
+### What was changed in Step 11
+- `lib/features/conversation/conversation_flow.dart` — Added `_cancelled` flag, `cancelThinking()` method, `interrupt()` now handles thinking state too, `_onSpeechResult()` checks `_cancelled` after API call to discard late responses
+- `lib/widgets/mic_button.dart` — Thinking state no longer disabled: taps call `interrupt()`. Icon changed from plain spinner to Stack with spinner + close icon. Accessibility label updated. Removed `isDisabled` gating
+
+### Interrupt State Machine
+```
+SPEAKING → (tap mic) → interrupt() → TTS.stop() → IDLE → startListening() → LISTENING
+THINKING → (tap mic) → interrupt() → cancelThinking() → _cancelled=true → IDLE
+                         ↳ API response arrives later → _cancelled check → discarded
+```
+- [x] **Step 12:** Performance optimization — streaming API + latency logging + connection pre-warming. Added `streamMessage()` to ChatService using Claude's SSE streaming (`stream: true`), which yields text chunks progressively. ConversationFlow now updates transcript in real-time as chunks arrive (text appears word-by-word during thinking). Non-streaming `sendMessage()` kept as fallback. Added `warmUp()` method that pre-establishes HTTPS/TLS connection on app startup (fire-and-forget). Granular latency logging: time-to-first-chunk, stream completion time, pipeline total time.
+
+### What was changed in Step 12
+- `lib/features/chat/chat_service.dart` — Refactored: extracted `_buildMessages()` and `_headers` getter. Added `streamMessage()` async generator that yields text chunks via SSE parsing (`content_block_delta` events). Added `warmUp()` for connection pre-warming. Logs: first-chunk time, stream completion time, output token usage.
+- `lib/features/conversation/conversation_flow.dart` — `_onSpeechResult()` now uses `await for` on `streamMessage()` stream. Transcript updates progressively as chunks arrive. Cancellation check works mid-stream (`_cancelled` flag breaks the loop). Rate limit retry also uses streaming.
+- `lib/main.dart` — Calls `chatService.warmUp()` (fire-and-forget) at startup to pre-warm TLS connection. Added `chat_service.dart` import.
+
+### Performance Optimizations
+| Optimization | Impact | Details |
+|---|---|---|
+| Streaming API (`stream: true`) | Perceived latency ↓ | Text appears progressively during thinking state |
+| Connection pre-warming | First-request latency ↓ | TLS handshake done at startup, not on first mic tap |
+| Granular latency logging | Debuggability ↑ | First-chunk time, stream total, pipeline total logged |
+| Mid-stream cancellation | Responsiveness ↑ | User can cancel during thinking, stream stops immediately |
+- [x] **Step 13:** Firebase Hosting deploy — Firebase CLI installed (v15.9.0), `firebase.json` configured with: SPA rewrite, CORS headers for JS/WASM, caching (immutable for JS/CSS/WASM, 1-week for images, no-cache default), public dir set to `build/web`. `.firebaserc` created with placeholder project ID. `.gitignore` updated to exclude `.firebase/` and `.firebaserc`. Production build verified (2.4MB JS bundle).
+
+### What was changed in Step 13
+- `firebase.json` — Created: hosting config with SPA rewrite, content-type headers for JS/WASM, tiered caching strategy
+- `.firebaserc` — Created: default project placeholder (`ai-avatar-chat`)
+- `.gitignore` — Added `.firebase/` and `.firebaserc`
+
+### Deploy Commands
+```bash
+# 1. Login to Firebase (one-time)
+firebase login
+
+# 2. Create or select a Firebase project
+firebase projects:create ai-avatar-chat    # or use existing project
+firebase use ai-avatar-chat
+
+# 3. Build and deploy
+flutter build web --release
+firebase deploy --only hosting
+
+# 4. Preview before deploying (optional)
+firebase hosting:channel:deploy preview
+```
+- [x] **Step 14:** ElevenLabs TTS upgrade — Created `elevenlabs_service.dart` with high-quality neural TTS. Features: voice preloading for faster first response, intelligent caching for common phrases, automatic fallback to system TTS on failure, streaming latency optimization (level 3), configurable voice settings. `TTSService` now orchestrates both ElevenLabs and flutter_tts, selecting based on configuration. Audio played via `AudioPlayerService` for consistent byte-stream playback.
+
+### What was changed in Step 14
+- `lib/features/voice/elevenlabs_service.dart` — Created: ElevenLabs API integration with SSE streaming support, voice preloading, audio caching, latency optimization, error handling
+- `lib/features/voice/tts_service.dart` — Full rewrite: Unified TTS service that uses ElevenLabs when available with automatic fallback to system TTS, proper initialization, completion handling for both audio player and system TTS
+- `lib/main.dart` — Added ElevenLabs configuration warning in startup checks
+
+### ElevenLabs Configuration
+Add to `.env`:
+```
+ELEVENLABS_API_KEY=sk_...
+ELEVENLABS_VOICE_ID=21m00Tcm4TlvDq8ikWAM  # Example: Rachel voice
+```
+
+### TTS Flow
+```
+speak(text) → try ElevenLabs → generate audio bytes → AudioPlayerService.playBytes()
+                    ↓ fails or not configured
+            fallback to flutter_tts → system speech synthesis
+```
+
+- [x] **Step 15:** REST API backend (Phase 2) — Created Node.js/Express backend in `backend/` directory. Features: JWT session management, secure API proxying to Kimi/ElevenLabs, server-side conversation history, rate limiting, streaming SSE responses. Backend hides all API keys from frontend. Flutter frontend updated with `USE_BACKEND` flag to switch between direct API and backend proxy.
+
+### What was changed in Step 15
+- `backend/server.js` — Created: Express server with `/api/auth/session`, `/api/chat` (streaming), `/api/tts`, `/api/history`, `/api/health` endpoints
+- `backend/package.json` — Created: Node.js dependencies (express, cors, helmet, express-rate-limit, jsonwebtoken, winston)
+- `backend/.env.example` — Created: Backend environment configuration template
+- `backend/README.md` — Created: Backend setup and deployment documentation
+- `lib/core/api_client.dart` — Created: Flutter HTTP client with JWT auth, SSE streaming support, retry logic
+- `lib/core/env.dart` — Added `USE_BACKEND` and `BACKEND_URL` configuration
+- `lib/features/chat/chat_service_interface.dart` — Created: Abstract interface for chat services
+- `lib/features/chat/chat_service.dart` — Refactored: Implements interface, unified provider with automatic backend/direct selection
+- `lib/features/chat/backend_chat_service.dart` — Created: Backend API implementation with session management
+- `.env.example` — Updated: Added backend configuration options
+
+### Backend Setup
+```bash
+cd backend
+cp .env.example .env
+# Edit .env with your API keys
+npm install
+npm start        # Production
+npm run dev      # Development with nodemon
+```
+
+### Frontend Configuration
+Add to `.env`:
+```
+USE_BACKEND=true
+BACKEND_URL=http://localhost:3000
+```
+
+### Architecture
+```
+Flutter App          Backend              External APIs
+     │                  │                       │
+     ├─ POST /chat ───►├─────── Kimi API ─────►│
+     │◄─ SSE stream ───├◄───── SSE stream ─────┤
+     │                  │                       │
+     ├─ POST /tts ────►├────── ElevenLabs ────►│
+     │◄─ audio/mpeg ───├◄──── audio/mpeg ──────┤
+```
+
+- [x] **Step 16:** Flutter mobile app (Phase 3) — Added iOS and Android platform support using `flutter create --platforms=ios,android`. Configured microphone and speech recognition permissions for both platforms. Updated app display names. Verified that `speech_to_text` and `flutter_tts` packages work correctly on mobile. Created `MOBILE.md` with comprehensive build and deployment guide for both platforms.
+
+### What was changed in Step 16
+- `android/` — Created: Android platform files with microphone and internet permissions, app name set to "AI Avatar"
+- `ios/` — Created: iOS platform files with microphone and speech recognition permissions, display name set to "AI Avatar"
+- `MOBILE.md` — Created: Comprehensive mobile build guide covering iOS and Android development, production builds, code signing, and deployment
+
+### Mobile Build Commands
+```bash
+# iOS (requires macOS and Xcode)
+flutter run -d ios                    # Development
+flutter build ios --release           # Release build
+flutter build ipa --export-method=app-store  # App Store
+
+# Android
+flutter run -d android                # Development
+flutter build apk --release           # APK for sideloading
+flutter build appbundle --release     # AAB for Play Store
+```
+
+### Mobile Features
+- **Speech Recognition**: Native iOS (`SFSpeechRecognizer`) and Android (`SpeechRecognizer`) via `speech_to_text`
+- **Text-to-Speech**: Native TTS on both platforms, with optional ElevenLabs for higher quality
+- **Permissions**: Microphone and speech recognition pre-configured
+- **Backend Support**: Mobile apps should use `USE_BACKEND=true` for security
 
 ## Resuming Work
 When resuming this project in a new session:

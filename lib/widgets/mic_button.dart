@@ -121,7 +121,7 @@ class _MicButtonState extends ConsumerState<MicButton>
         case ConversationState.speaking:
           await notifier.interrupt();
         case ConversationState.thinking:
-          break;
+          await notifier.interrupt();
       }
     } finally {
       _tapping = false;
@@ -187,13 +187,19 @@ class _MicButtonState extends ConsumerState<MicButton>
       case ConversationState.listening:
         return const Icon(Icons.mic, color: AppColors.textPrimary, size: 32);
       case ConversationState.thinking:
-        return const SizedBox(
-          width: 26,
-          height: 26,
-          child: CircularProgressIndicator(
-            color: AppColors.textSecondary,
-            strokeWidth: 2.5,
-          ),
+        return const Stack(
+          alignment: Alignment.center,
+          children: [
+            SizedBox(
+              width: 32,
+              height: 32,
+              child: CircularProgressIndicator(
+                color: AppColors.textSecondary,
+                strokeWidth: 2,
+              ),
+            ),
+            Icon(Icons.close, color: AppColors.textSecondary, size: 16),
+          ],
         );
       case ConversationState.speaking:
         return const Icon(Icons.stop, color: AppColors.accent, size: 32);
@@ -207,7 +213,7 @@ class _MicButtonState extends ConsumerState<MicButton>
       case ConversationState.listening:
         return 'Stop recording';
       case ConversationState.thinking:
-        return 'Processing, please wait';
+        return 'Cancel and return to idle';
       case ConversationState.speaking:
         return 'Interrupt and speak';
     }

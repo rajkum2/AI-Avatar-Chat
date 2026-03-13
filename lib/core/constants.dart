@@ -1,11 +1,11 @@
 class AppConstants {
   AppConstants._();
 
-  // Claude API
-  static const String claudeApiUrl = 'https://api.anthropic.com/v1/messages';
-  static const String claudeModel = 'claude-sonnet-4-20250514';
-  static const String claudeApiVersion = '2023-06-01';
-  static const int claudeMaxTokens = 300;
+  // Kimi Chat API (Moonshot AI — OpenAI-compatible)
+  static const String kimiApiUrl =
+      'https://api.moonshot.cn/v1/chat/completions';
+  static const String kimiModel = 'moonshot-v1-8k';
+  static const int kimiMaxTokens = 300;
   static const Duration apiTimeout = Duration(seconds: 15);
 
   // System prompt for conversational avatar

@@ -146,8 +146,8 @@ class ConversationNotifier extends StateNotifier<ConversationState> {
     }
 
     // Check API key before making the call
-    if (!Env.hasAnthropicKey) {
-      _showError('API key not configured — add ANTHROPIC_API_KEY to .env');
+    if (!Env.hasKimiKey) {
+      _showError('API key not configured — add KIMI_API_KEY to .env');
       state = ConversationState.idle;
       _updateAvatarState();
       return;
@@ -165,19 +165,40 @@ class ConversationNotifier extends StateNotifier<ConversationState> {
       // Add user message to history before sending
       _ref.read(chatHistoryProvider.notifier).addUserMessage(transcript);
 
-      String reply;
+      // Use streaming API for progressive text display
+      final replyBuffer = StringBuffer();
       try {
-        reply = await chatService.sendMessage(transcript, history);
+        await for (final chunk
+            in chatService.streamMessage(transcript, history)) {
+          if (_cancelled) {
+            debugPrint('Pipeline: Stream cancelled by user');
+            return;
+          }
+          replyBuffer.write(chunk);
+          // Progressive text update during thinking
+          _ref.read(transcriptProvider.notifier).state =
+              replyBuffer.toString();
+        }
       } on ChatRateLimitException {
-        _ref.read(transcriptProvider.notifier).state =
-            'Give me a moment...';
+        // Retry once on rate limit
+        replyBuffer.clear();
+        _ref.read(transcriptProvider.notifier).state = 'Give me a moment...';
         await Future.delayed(const Duration(seconds: 2));
-        reply = await chatService.sendMessage(transcript, history);
+        if (_cancelled) return;
+        await for (final chunk
+            in chatService.streamMessage(transcript, history)) {
+          if (_cancelled) return;
+          replyBuffer.write(chunk);
+          _ref.read(transcriptProvider.notifier).state =
+              replyBuffer.toString();
+        }
       }
 
-      // If user cancelled while we were waiting for the API, discard result
-      if (_cancelled) {
-        debugPrint('Pipeline: API response discarded (cancelled)');
+      final reply = replyBuffer.toString().trim();
+      if (reply.isEmpty) {
+        _showError('Empty response from AI');
+        state = ConversationState.idle;
+        _updateAvatarState();
         return;
       }
 

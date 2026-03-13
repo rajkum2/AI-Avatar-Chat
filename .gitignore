@@ -48,3 +48,7 @@ app.*.map.json
 .env
 .env.*
 !.env.example
+
+# Firebase
+.firebase/
+.firebaserc

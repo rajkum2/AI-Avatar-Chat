@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/env.dart';
 import 'core/theme.dart';
+import 'features/chat/chat_service.dart';
 import 'features/conversation/conversation_flow.dart';
 import 'features/voice/stt_service.dart';
 import 'features/voice/tts_service.dart';
@@ -44,6 +45,9 @@ class _AppInitializerState extends ConsumerState<_AppInitializer> {
   }
 
   Future<void> _initServices() async {
+    // Pre-warm HTTPS connection to Kimi API (fire and forget)
+    ref.read(chatServiceProvider).warmUp();
+
     // Pre-initialize TTS so it's ready when first response arrives
     final tts = ref.read(ttsServiceProvider);
     await tts.initialize();
@@ -62,13 +66,18 @@ class _AppInitializerState extends ConsumerState<_AppInitializer> {
       });
     }
 
-    // Warn if API key is missing after everything is loaded
-    if (!Env.hasAnthropicKey && mounted) {
-      // Delay to let the UI build first
+    // Warn if API keys are missing after everything is loaded
+    if (mounted) {
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) {
-          ref.read(errorMessageProvider.notifier).state =
-              'API key not set — add ANTHROPIC_API_KEY to .env file';
+          if (!Env.hasKimiKey) {
+            ref.read(errorMessageProvider.notifier).state =
+                'API key not set — add KIMI_API_KEY to .env file';
+          } else if (!Env.hasElevenLabsKey) {
+            // Only show if Kimi is configured but ElevenLabs isn't
+            ref.read(errorMessageProvider.notifier).state =
+                'ElevenLabs not configured — using system TTS';
+          }
         }
       });
     }
