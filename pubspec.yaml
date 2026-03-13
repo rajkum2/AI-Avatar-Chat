@@ -36,6 +36,17 @@ dependencies:
   # Environment
   flutter_dotenv: ^5.1.0
 
+  # Storage & Files
+  shared_preferences: ^2.2.2
+  path_provider: ^2.1.2
+  path: ^1.9.0
+
+  # UI Components
+  flutter_slidable: ^3.1.0
+
+  # FFI (for mobile on-device LLM)
+  ffi: ^2.1.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

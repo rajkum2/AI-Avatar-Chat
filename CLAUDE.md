@@ -384,6 +384,69 @@ flutter build appbundle --release     # AAB for Play Store
 - **Permissions**: Microphone and speech recognition pre-configured
 - **Backend Support**: Mobile apps should use `USE_BACKEND=true` for security
 
+---
+
+## Local LLM Support (NEW)
+
+The app now supports running entirely offline with local open-source LLMs via **Ollama**. No API keys or internet required for AI chat.
+
+### Quick Start with Ollama
+
+1. **Install Ollama**: https://ollama.com
+2. **Download a model**:
+   ```bash
+   ollama pull llama3.2:3b  # 2GB, good quality
+   # or
+   ollama pull llama3.2:1b  # 1.3GB, faster
+   ```
+3. **Configure the app**:
+   ```bash
+   # .env
+   LLM_PROVIDER=ollama
+   OLLAMA_MODEL=llama3.2:3b
+   ```
+4. **Run the app** - it will automatically connect to Ollama at `localhost:11434`
+
+### Implemented Features
+- `lib/features/chat/ollama_service.dart` — Ollama API client with streaming
+- `lib/core/env.dart` — LLM provider selection (`LLM_PROVIDER` env var)
+- Unified provider architecture — swap between Kimi/Backend/Ollama with one config change
+
+### Supported Models
+
+| Model | Size | Speed | Best For |
+|-------|------|-------|----------|
+| llama3.2:1b | 1.3GB | ⭐⭐⭐⭐⭐ | Fast responses, simple queries |
+| llama3.2:3b | 2.0GB | ⭐⭐⭐⭐ | Good balance quality/speed |
+| phi3:mini | 1.8GB | ⭐⭐⭐⭐ | Microsoft, good instruction following |
+| gemma2:2b | 1.6GB | ⭐⭐⭐⭐ | Google, compact |
+| qwen2.5:3b | 2.0GB | ⭐⭐⭐ | Multilingual support |
+
+### Architecture Options
+
+See `LOCAL_LLM_PLAN.md` for complete details on:
+- **Option 1**: Ollama (Desktop/Web) ✅ IMPLEMENTED
+- **Option 2**: llama.cpp FFI (Mobile on-device)
+- **Option 3**: WebGPU (Browser-only)
+- **Option 4**: Self-hosted server (vLLM/TGI)
+
+### Configuration
+
+```bash
+# Use cloud API (original)
+LLM_PROVIDER=kimi
+KIMI_API_KEY=your_key_here
+
+# Use local Ollama (FREE)
+LLM_PROVIDER=ollama
+OLLAMA_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.2:3b
+
+# Use your own backend
+LLM_PROVIDER=backend
+BACKEND_URL=http://your-server:3000
+```
+
 ## Resuming Work
 When resuming this project in a new session:
 1. Run `flutter analyze` to verify no regressions

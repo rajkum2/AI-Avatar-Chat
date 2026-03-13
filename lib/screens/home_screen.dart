@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme.dart';
+import '../features/admin/admin_dashboard.dart';
 import '../features/avatar/avatar_widget.dart';
 import '../features/chat/chat_provider.dart';
 import '../features/conversation/conversation_flow.dart';
@@ -119,8 +120,14 @@ class HomeScreen extends ConsumerWidget {
             ),
             IconButton(
               icon: const Icon(Icons.settings_outlined, size: 20),
-              tooltip: 'Settings',
-              onPressed: () {},
+              tooltip: 'LLM Settings',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const AdminDashboard(),
+                  ),
+                );
+              },
             ),
           ],
         ),

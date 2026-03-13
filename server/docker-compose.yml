@@ -1,0 +1,110 @@
+version: '3.8'
+
+services:
+  # Option 1: vLLM (Recommended for production)
+  vllm:
+    image: vllm/vllm-openai:latest
+    runtime: nvidia
+    ports:
+      - "8000:8000"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - CUDA_DEVICE_ORDER=PCI_BUS_ID
+    volumes:
+      - ./models:/root/.cache/huggingface
+      - ./data:/data
+    command: >
+      --model ${MODEL_NAME:-meta-llama/Llama-3.2-3B-Instruct}
+      --quantization ${QUANTIZATION:-awq}
+      --dtype auto
+      --max-model-len 4096
+      --tensor-parallel-size 1
+      --gpu-memory-utilization 0.9
+      --port 8000
+      --api-key ${API_KEY:-}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Option 2: Text Generation Inference (TGI) - Alternative
+  tgi:
+    image: ghcr.io/huggingface/text-generation-inference:2.0
+    runtime: nvidia
+    ports:
+      - "8080:80"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - MODEL_ID=${MODEL_NAME:-meta-llama/Llama-3.2-3B-Instruct}
+      - QUANTIZE=${QUANTIZATION:-awq}
+      - MAX_INPUT_LENGTH=2048
+      - MAX_TOTAL_TOKENS=4096
+      - MAX_BATCH_PREFILL_TOKENS=2048
+    volumes:
+      - ./models:/data
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+    profiles:
+      - tgi  # Only start when explicitly requested
+
+  # Option 3: llama.cpp server - CPU friendly
+  llama-cpp:
+    build:
+      context: ./llama-cpp
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./models:/models:ro
+    command: >
+      -m /models/${MODEL_FILE:-llama-3.2-3b-q4_K_M.gguf}
+      --host 0.0.0.0
+      --port 8080
+      -c 4096
+      -np 4
+    restart: unless-stopped
+    profiles:
+      - llama-cpp
+
+  # Nginx reverse proxy with SSL
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - vllm
+    restart: unless-stopped
+    profiles:
+      - production
+
+  # Model downloader helper
+  model-downloader:
+    build:
+      context: ./model-downloader
+      dockerfile: Dockerfile
+    volumes:
+      - ./models:/models
+    environment:
+      - MODEL_NAME=${MODEL_NAME:-meta-llama/Llama-3.2-3B-Instruct}
+      - QUANTIZATION=${QUANTIZATION:-Q4_K_M}
+    profiles:
+      - download
