@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/env.dart';
 import 'conversation_state.dart';
 import '../avatar/avatar_controller.dart';
+import '../avatar/avatar_data.dart';
 import '../voice/stt_service.dart';
 import '../voice/tts_service.dart';
 import '../chat/chat_service.dart';
@@ -37,6 +38,15 @@ class ConversationNotifier extends StateNotifier<ConversationState> {
 
   void _updateAvatarState() {
     _ref.read(avatarStateProvider.notifier).updateFromConversation(state);
+    
+    // Also update expression for human avatars
+    final expression = switch (state) {
+      ConversationState.idle => AvatarExpression.neutral,
+      ConversationState.listening => AvatarExpression.listening,
+      ConversationState.thinking => AvatarExpression.thinking,
+      ConversationState.speaking => AvatarExpression.speaking,
+    };
+    _ref.read(avatarExpressionProvider.notifier).state = expression;
   }
 
   void _showError(String message) {

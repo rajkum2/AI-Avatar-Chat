@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme.dart';
 import '../features/admin/admin_dashboard.dart';
+import '../features/avatar/avatar_selection_screen.dart';
 import '../features/avatar/avatar_widget.dart';
 import '../features/chat/chat_provider.dart';
 import '../features/conversation/conversation_flow.dart';
@@ -114,6 +115,17 @@ class HomeScreen extends ConsumerWidget {
                   const SnackBar(
                     content: Text('Conversation cleared'),
                     duration: Duration(seconds: 1),
+                  ),
+                );
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.face_outlined, size: 20),
+              tooltip: 'Choose Avatar',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const AvatarSelectionScreen(),
                   ),
                 );
               },
