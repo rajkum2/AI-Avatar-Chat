@@ -4,7 +4,9 @@ import 'package:lottie/lottie.dart';
 import '../../core/theme.dart';
 import 'avatar_controller.dart';
 import 'avatar_state.dart';
+import 'human_avatar_widget.dart';
 
+/// Main avatar widget that switches between human and animated styles
 class AvatarWidget extends ConsumerStatefulWidget {
   const AvatarWidget({super.key});
 
@@ -32,6 +34,7 @@ class _AvatarWidgetState extends ConsumerState<AvatarWidget>
   @override
   Widget build(BuildContext context) {
     final avatarState = ref.watch(avatarStateProvider);
+    final config = ref.watch(avatarConfigProvider);
 
     // Stop thinking controller when leaving thinking state
     if (_previousState == AvatarState.thinking &&
@@ -41,6 +44,15 @@ class _AvatarWidgetState extends ConsumerState<AvatarWidget>
     }
     _previousState = avatarState;
 
+    // Use human avatar for human characters, Lottie for robot
+    if (config.character.isHuman) {
+      return const HumanAvatarWidget();
+    }
+
+    return _buildLottieAvatar(avatarState);
+  }
+
+  Widget _buildLottieAvatar(AvatarState avatarState) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final maxSize = constraints.maxHeight * 0.8;
@@ -48,196 +60,162 @@ class _AvatarWidgetState extends ConsumerState<AvatarWidget>
 
         return Center(
           child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 300),
+            duration: const Duration(milliseconds: 500),
             transitionBuilder: (child, animation) {
-              return FadeTransition(
-                opacity: animation,
-                child: ScaleTransition(
-                  scale: Tween<double>(begin: 0.95, end: 1.0).animate(
-                    CurvedAnimation(
-                      parent: animation,
-                      curve: Curves.easeOut,
-                    ),
-                  ),
+              return ScaleTransition(
+                scale: animation,
+                child: FadeTransition(
+                  opacity: animation,
                   child: child,
                 ),
               );
             },
-            child: SizedBox(
-              key: ValueKey(avatarState),
-              width: size,
-              height: size,
-              child: _buildAvatar(avatarState),
-            ),
+            child: _buildAvatarForState(avatarState, size),
           ),
         );
       },
     );
   }
 
-  Widget _buildAvatar(AvatarState state) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        // State-colored glow behind avatar
-        _buildGlow(state),
-        // Lottie animation
-        _buildAnimation(state),
-      ],
-    );
-  }
-
-  Widget _buildGlow(AvatarState state) {
-    final Color glowColor;
-    final double glowSize;
-
+  Widget _buildAvatarForState(AvatarState state, double size) {
     switch (state) {
       case AvatarState.idle:
-        glowColor = AppColors.primary;
-        glowSize = 0.7;
+        return _buildGlow(
+          child: _buildAnimation(
+            'assets/animations/avatar_idle.json',
+            size,
+            key: const ValueKey('idle'),
+          ),
+          color: AppColors.primary,
+        );
       case AvatarState.listening:
-        glowColor = AppColors.accent;
-        glowSize = 0.8;
+        return _buildGlow(
+          child: _buildAnimation(
+            'assets/animations/avatar_listen.json',
+            size,
+            key: const ValueKey('listen'),
+          ),
+          color: AppColors.active,
+        );
       case AvatarState.speaking:
-        glowColor = AppColors.primary;
-        glowSize = 0.75;
+        return _buildGlow(
+          child: _buildAnimation(
+            'assets/animations/avatar_speak.json',
+            size,
+            key: const ValueKey('speak'),
+          ),
+          color: AppColors.primary,
+        );
       case AvatarState.thinking:
-        glowColor = AppColors.textSecondary;
-        glowSize = 0.65;
+        // Double duration for half-speed effect
+        _thinkingController.duration = const Duration(milliseconds: 4000);
+        if (!_thinkingController.isAnimating) {
+          _thinkingController.repeat();
+        }
+        return _buildGlow(
+          child: _buildAnimation(
+            'assets/animations/avatar_idle.json', // Use idle for thinking
+            size,
+            controller: _thinkingController,
+            key: const ValueKey('thinking'),
+          ),
+          color: AppColors.primary,
+        );
     }
+  }
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 400),
-      width: double.infinity,
-      height: double.infinity,
+  Widget _buildGlow({required Widget child, required Color color}) {
+    return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: glowColor.withValues(alpha: 0.15),
-            blurRadius: 60,
-            spreadRadius: 20 * glowSize,
+            color: color.withValues(alpha: 0.3),
+            blurRadius: 40,
+            spreadRadius: 10,
           ),
         ],
       ),
+      child: child,
     );
   }
 
-  Widget _buildAnimation(AvatarState state) {
-    final String assetPath;
-
-    switch (state) {
-      case AvatarState.idle:
-        assetPath = 'assets/animations/avatar_idle.json';
-      case AvatarState.listening:
-        assetPath = 'assets/animations/avatar_listen.json';
-      case AvatarState.speaking:
-        assetPath = 'assets/animations/avatar_speak.json';
-      case AvatarState.thinking:
-        assetPath = 'assets/animations/avatar_idle.json';
-    }
-
-    if (state == AvatarState.thinking) {
-      return Lottie.asset(
-        assetPath,
-        controller: _thinkingController,
-        fit: BoxFit.contain,
-        onLoaded: (composition) {
-          _thinkingController
-            ..duration = composition.duration * 2 // Half speed
-            ..repeat();
-        },
-        errorBuilder: (context, error, stackTrace) {
-          return _buildPlaceholder(state);
-        },
-      );
-    }
-
+  Widget _buildAnimation(
+    String assetPath,
+    double size, {
+    AnimationController? controller,
+    Key? key,
+  }) {
     return Lottie.asset(
       assetPath,
-      animate: true,
-      repeat: true,
-      fit: BoxFit.contain,
+      width: size,
+      height: size,
+      controller: controller,
+      key: key,
       errorBuilder: (context, error, stackTrace) {
-        return _buildPlaceholder(state);
+        return _buildPlaceholder(size);
       },
     );
   }
 
-  Widget _buildPlaceholder(AvatarState state) {
-    final IconData icon;
-    final Color color;
-    final String label;
+  Widget _buildPlaceholder(double size) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.surfaceLight, width: 2),
+      ),
+      child: const Center(
+        child: Icon(
+          Icons.person,
+          size: 80,
+          color: Colors.white54,
+        ),
+      ),
+    );
+  }
+}
 
-    switch (state) {
-      case AvatarState.idle:
-        icon = Icons.face;
-        color = AppColors.primary;
-        label = '';
-      case AvatarState.listening:
-        icon = Icons.hearing;
-        color = AppColors.accent;
-        label = 'Listening';
-      case AvatarState.speaking:
-        icon = Icons.record_voice_over;
-        color = AppColors.primary;
-        label = 'Speaking';
-      case AvatarState.thinking:
-        icon = Icons.psychology;
-        color = AppColors.textSecondary;
-        label = 'Thinking';
-    }
+/// Small avatar preview button for the home screen
+class AvatarPreviewButton extends ConsumerWidget {
+  final VoidCallback? onTap;
 
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Container(
-          width: 160,
-          height: 160,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: AppColors.surface,
-            border: Border.all(
-              color: color.withValues(alpha: 0.4),
-              width: 2.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: color.withValues(alpha: 0.15),
-                blurRadius: 30,
-                spreadRadius: 5,
-              ),
+  const AvatarPreviewButton({super.key, this.onTap});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final config = ref.watch(avatarConfigProvider);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              config.character.gender.color.withValues(alpha: 0.8),
+              config.character.gender.color.withValues(alpha: 0.4),
             ],
           ),
-          child: state == AvatarState.thinking
-              ? Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    SizedBox(
-                      width: 100,
-                      height: 100,
-                      child: CircularProgressIndicator(
-                        color: color.withValues(alpha: 0.3),
-                        strokeWidth: 2,
-                      ),
-                    ),
-                    Icon(icon, size: 64, color: color),
-                  ],
-                )
-              : Icon(icon, size: 80, color: color),
-        ),
-        if (label.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              color: color.withValues(alpha: 0.7),
-              letterSpacing: 1.2,
-            ),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.3),
+            width: 2,
           ),
-        ],
-      ],
+        ),
+        child: Center(
+          child: Icon(
+            config.character.isHuman ? config.character.gender.icon : Icons.smart_toy,
+            color: Colors.white,
+            size: 20,
+          ),
+        ),
+      ),
     );
   }
 }
